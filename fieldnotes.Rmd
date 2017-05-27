@@ -19,6 +19,7 @@ opts_chunk$set(
 )
 library(rgdal)
 library(rgeos)
+library(osmar)
 library(dplyr)
 library(ggplot2)
 ```
@@ -30,6 +31,9 @@ studyarea <- readOGR("studyarea.geojson", verbose = FALSE) %>%
 
 ```{r project}
 studyarea_proj <- spTransform(studyarea, CRS(params$crs))
+studyarea_buffer <- studyarea_proj %>%
+  gBuffer(width = 5 * params$cellsize) %>%
+  spTransform(CRS("+proj=longlat"))
 ```
 
 ```{r find_optimal_angle}
@@ -109,11 +113,49 @@ grid_local <- grid_local[overlap, ]
 grid_df <- fortify(grid_local)
 ```
 
+```{r import_osm}
+osm <- as_osmar_bbox(studyarea_buffer) %>%
+  get_osm()
+```
+
+```{r osm_local_coordinates}
+osm_local <- SpatialPointsDataFrame(
+  coords = osm$nodes$attrs %>%
+    select(long = lon, lat), 
+  data = osm$nodes$attrs %>%
+    select(ref = id), 
+  proj4string = studyarea@proj4string
+) %>%
+  spTransform(CRS(params$crs)) %>%
+  as.data.frame() %>%
+  mutate(
+    x = long - center[1], 
+    y = lat - center[2],
+    long = cos(angle) * x + sin(angle) * y,
+    lat = -sin(angle) * x + cos(angle) * y
+  ) %>%
+  select(-x, -y)
+```
+
+```{r osm_layers}
+road <- osm$ways$tags %>%
+  filter(k == "highway") %>%
+  inner_join(osm$ways$refs, by = "id") %>%
+  inner_join(
+    osm_local, 
+    by = "ref"
+  )
+```
+
 ```{r fig.cap = "Overview study area"}
 ggplot(studyarea_df, aes(x = long, y = lat)) +
   geom_polygon(aes(group = group), fill = NA, colour = "black", size = 2) +
   geom_polygon(data = grid_df, aes(group = group), fill = NA, colour = "black") +
-  coord_fixed() +
+  geom_path(data = road, aes(group = id), colour = "grey") +
+  coord_fixed(
+    xlim = range(grid_df$long),
+    ylim = range(grid_df$lat)
+  ) +
   theme(
     axis.text = element_blank(), 
     axis.title = element_blank(),
