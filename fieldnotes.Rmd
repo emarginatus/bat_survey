@@ -12,11 +12,14 @@ params:
 ```{r setup, include=FALSE}
 library(knitr)
 opts_chunk$set(
+  cache = TRUE,
+  autodep = TRUE,
   echo = FALSE
 )
 library(rgdal)
 library(rgeos)
 library(dplyr)
+library(ggplot2)
 ```
 
 ```{r load_data}
@@ -27,6 +30,7 @@ studyarea <- readOGR("studyarea.geojson", verbose = FALSE) %>%
 ```{r project}
 studyarea_proj <- spTransform(studyarea, CRS(params$crs))
 ```
+
 ```{r find_optimal_angle}
 raw_coordinates <- lapply(
   studyarea_proj@polygons,
@@ -36,8 +40,10 @@ raw_coordinates <- lapply(
       do.call(what = "rbind")
   }
 ) %>%
-  do.call(what = "rbind") %>%
-  scale(center = TRUE, scale = FALSE)
+  do.call(what = "rbind")
+center <- apply(raw_coordinates, 2, range) %>%
+  colMeans()
+raw_coordinates <- raw_coordinates - matrix(center, byrow = TRUE, ncol = 2, nrow = nrow(raw_coordinates))
 bb_area <- function(raw_coordinates, angle){
   raw_coordinates %*%
     matrix(c(cos(angle), sin(angle), -sin(angle), cos(angle)), ncol = 2) %>%
@@ -45,5 +51,39 @@ bb_area <- function(raw_coordinates, angle){
     apply(2, diff) %>%
     prod()
 }
-angle <- optimize(bb_area, interval = c(0, pi / 2), raw_coordinates = raw_coordinates)$minimum
+angle <- optimize(bb_area, interval = c(0, -pi / 2), raw_coordinates = raw_coordinates)$minimum
+```
+
+```{r rotate_studyarea}
+studyarea_local <- studyarea_proj
+studyarea_local@proj4string <- CRS("")
+studyarea_local@polygons <- lapply(
+  studyarea_local@polygons,
+  function(x){
+    x@Polygons <- lapply(
+      x@Polygons,
+      function(y){
+        y@coords <- -matrix(center, byrow = TRUE, ncol = 2, nrow = nrow(y@coords)) %>%
+          "+"(y@coords) %>%
+          "%*%"(matrix(c(cos(angle), sin(angle), -sin(angle), cos(angle)), ncol = 2))
+        return(y)
+      }
+    )
+    return(x)
+  }
+)
+studyarea_local <- fortify(studyarea_local)
+```
+
+```{r}
+ggplot(studyarea_local, aes(x = long, y = lat)) +
+  geom_polygon(aes(group = group), fill = NA, colour = "black") +
+  coord_fixed() +
+  theme(
+    axis.text = element_blank(), 
+    axis.title = element_blank(),
+    axis.ticks = element_blank(),
+    panel.background = element_blank(),
+    panel.grid = element_blank()
+  )
 ```
