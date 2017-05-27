@@ -1,0 +1,49 @@
+---
+title: "Field forms"
+author: "Thierry Onkelinx"
+date: "`r format(Sys.time(), '%e/%m/%Y %T %Z')`"
+output: html_document
+params:
+  studyarea: 1
+  crs: "+init=epsg:31370"
+  cellsize: 100
+---
+
+```{r setup, include=FALSE}
+library(knitr)
+opts_chunk$set(
+  echo = FALSE
+)
+library(rgdal)
+library(rgeos)
+library(dplyr)
+```
+
+```{r load_data}
+studyarea <- readOGR("studyarea.geojson", verbose = FALSE) %>%
+  subset(id = params$studyarea)
+```
+
+```{r project}
+studyarea_proj <- spTransform(studyarea, CRS(params$crs))
+```
+```{r find_optimal_angle}
+raw_coordinates <- lapply(
+  studyarea_proj@polygons,
+  function(x){
+    x@Polygons %>%
+      lapply(coordinates) %>%
+      do.call(what = "rbind")
+  }
+) %>%
+  do.call(what = "rbind") %>%
+  scale(center = TRUE, scale = FALSE)
+bb_area <- function(raw_coordinates, angle){
+  raw_coordinates %*%
+    matrix(c(cos(angle), sin(angle), -sin(angle), cos(angle)), ncol = 2) %>%
+    apply(2, range) %>%
+    apply(2, diff) %>%
+    prod()
+}
+angle <- optimize(bb_area, interval = c(0, pi / 2), raw_coordinates = raw_coordinates)$minimum
+```
