@@ -14,6 +14,7 @@ library(knitr)
 opts_chunk$set(
   cache = TRUE,
   autodep = TRUE,
+  message = FALSE,
   echo = FALSE
 )
 library(rgdal)
@@ -72,12 +73,46 @@ studyarea_local@polygons <- lapply(
     return(x)
   }
 )
-studyarea_local <- fortify(studyarea_local)
+studyarea_df <- fortify(studyarea_local)
 ```
 
-```{r}
-ggplot(studyarea_local, aes(x = long, y = lat)) +
-  geom_polygon(aes(group = group), fill = NA, colour = "black") +
+```{r local_grid}
+grid_df <- expand.grid(
+  long = seq(
+    min(studyarea_df$long),
+    max(studyarea_df$long),
+    by = params$cellsize
+  ),
+  lat = seq(
+    min(studyarea_df$lat),
+    max(studyarea_df$lat),
+    by = params$cellsize
+  )
+)
+grid_local <- lapply(
+  seq_along(grid_df$long), 
+  function(i){
+    cbind(
+      grid_df$long[i] + params$cellsize * c(0, 1, 1, 0, 0),
+      grid_df$lat[i] + params$cellsize * c(0, 0, 1, 1, 0)
+    ) %>%
+      Polygon() %>%
+      list() %>%
+      Polygons(ID = i)
+  }
+) %>%
+  SpatialPolygons()
+overlap <- gRelate(studyarea_local, grid_local, byid = TRUE) %>%
+  as.vector() %>%
+  grepl(pattern = "^2")
+grid_local <- grid_local[overlap, ]
+grid_df <- fortify(grid_local)
+```
+
+```{r fig.cap = "Overview study area"}
+ggplot(studyarea_df, aes(x = long, y = lat)) +
+  geom_polygon(aes(group = group), fill = NA, colour = "black", size = 2) +
+  geom_polygon(data = grid_df, aes(group = group), fill = NA, colour = "black") +
   coord_fixed() +
   theme(
     axis.text = element_blank(), 
