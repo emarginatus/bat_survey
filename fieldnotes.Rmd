@@ -170,12 +170,25 @@ water <- osm$relations$tags %>%
   inner_join(osm_local, by = c("ref.y" = "ref")) %>%
   select(id, long, lat) %>%
   bind_rows(water)
+grass <- osm$ways$tags %>%
+  filter((k == "natural" & v == "grasland") | (k == "landuse" & v %in% c("grass", "meadow"))) %>%
+  inner_join(osm$ways$refs, by = "id") %>%
+  inner_join(osm_local, by = "ref") %>%
+  select(id, long, lat)
+grass <- osm$relations$tags %>%
+  filter((k == "natural" & v == "grasland") | (k == "landuse" & v %in% c("grass", "meadow"))) %>%
+  inner_join(osm$relations$refs, by = "id") %>%
+  inner_join(osm$ways$refs, by = c("ref" = "id")) %>%
+  inner_join(osm_local, by = c("ref.y" = "ref")) %>%
+  select(id, long, lat) %>%
+  bind_rows(grass)
 ```
 
 ```{r fig.cap = "Overzicht"}
 ggplot(studyarea_df, aes(x = long, y = lat)) +
   geom_polygon(data = water, aes(group = id), fill = "blue") +
   geom_polygon(data = forest, aes(group = id), fill = "darkgreen") +
+  geom_polygon(data = grass, aes(group = id), fill = "green") +
   geom_polygon(aes(group = group), fill = NA, colour = "black", size = 2) +
   geom_polygon(data = grid_df, aes(group = group), fill = NA, colour = "black") +
   geom_path(data = waterway, aes(group = id), colour = "blue") +
