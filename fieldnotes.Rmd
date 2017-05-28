@@ -1,5 +1,5 @@
 ---
-title: "Field forms"
+title: "Veldformulier"
 author: "Thierry Onkelinx"
 date: "`r format(Sys.time(), '%e/%m/%Y %T %Z')`"
 output: html_document
@@ -158,10 +158,23 @@ forest <- osm$relations$tags %>%
   inner_join(osm_local, by = c("ref.y" = "ref")) %>%
   select(id, long, lat) %>%
   bind_rows(forest)
+water <- osm$ways$tags %>%
+  filter(k == "natural", v == "water") %>%
+  inner_join(osm$ways$refs, by = "id") %>%
+  inner_join(osm_local, by = "ref") %>%
+  select(id, long, lat)
+water <- osm$relations$tags %>%
+  filter(k == "natural", v == "water") %>%
+  inner_join(osm$relations$refs, by = "id") %>%
+  inner_join(osm$ways$refs, by = c("ref" = "id")) %>%
+  inner_join(osm_local, by = c("ref.y" = "ref")) %>%
+  select(id, long, lat) %>%
+  bind_rows(water)
 ```
 
-```{r fig.cap = "Overview study area"}
+```{r fig.cap = "Overzicht"}
 ggplot(studyarea_df, aes(x = long, y = lat)) +
+  geom_polygon(data = water, aes(group = id), fill = "blue") +
   geom_polygon(data = forest, aes(group = id), fill = "darkgreen") +
   geom_polygon(aes(group = group), fill = NA, colour = "black", size = 2) +
   geom_polygon(data = grid_df, aes(group = group), fill = NA, colour = "black") +
