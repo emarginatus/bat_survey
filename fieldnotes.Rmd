@@ -1,6 +1,8 @@
 ---
 author: "Thierry Onkelinx"
 date: "`r paste('Versie:', format(Sys.time(), '%e/%m/%Y %T %Z'))`"
+header-includes:
+   - \usepackage[dutch]{babel}
 output: pdf_document
 params:
   studyarea: 1
