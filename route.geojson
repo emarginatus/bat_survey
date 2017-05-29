@@ -4,6 +4,7 @@
     {
       "type": "Feature",
       "properties": {
+        "studyarea": 1,
         "date": "2017-05-25"
       },
       "geometry": {

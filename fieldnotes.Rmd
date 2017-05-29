@@ -30,6 +30,8 @@ library(ggplot2)
 ```{r load_data}
 studyarea <- readOGR("studyarea.geojson", verbose = FALSE) %>%
   subset(id = params$studyarea)
+route <- readOGR("route.geojson", verbose = FALSE) %>%
+  subset(id = params$studyarea)
 ```
 
 ---
@@ -68,6 +70,7 @@ studyarea_proj <- spTransform(studyarea, CRS(params$crs))
 studyarea_buffer <- studyarea_proj %>%
   gBuffer(width = 5 * params$cellsize) %>%
   spTransform(CRS("+proj=longlat"))
+route_proj <- spTransform(route, CRS(params$crs))
 ```
 
 ```{r find_optimal_angle}
@@ -114,6 +117,26 @@ studyarea_local@polygons <- lapply(
 studyarea_df <- fortify(studyarea_local)
 ```
 
+```{r rotate_route}
+route_local <- route_proj
+route_local@proj4string <- CRS("")
+route_local@lines <- lapply(
+  route_local@lines,
+  function(x){
+    x@Lines <- lapply(
+      x@Lines,
+      function(y){
+        y@coords <- -matrix(center, byrow = TRUE, ncol = 2, nrow = nrow(y@coords)) %>%
+          "+"(y@coords) %>%
+          "%*%"(matrix(c(cos(angle), sin(angle), -sin(angle), cos(angle)), ncol = 2))
+        return(y)
+      }
+    )
+    return(x)
+  }
+)
+```
+
 ```{r local_grid}
 grid_df <- expand.grid(
   long = seq(
@@ -140,11 +163,24 @@ grid_local <- lapply(
   }
 ) %>%
   SpatialPolygons()
+grid_local$surveyed <- rep(0, length(grid_local))
+surveyed <- gBuffer(route_local, width = 20) %>%
+  gIntersection(grid_local, byid = TRUE) %>%
+  gArea(byid = TRUE) %>%
+  "/"(params$cellsize ^ 2)
+grid_local$surveyed[
+  gsub("buffer ", "", names(surveyed)) %>%
+    as.integer()
+] <- surveyed
+grid_df <- fortify(grid_local)
+grid_df$surveyed <- grid_local$surveyed[as.integer(grid_df$id)]
+  
 overlap <- gRelate(studyarea_local, grid_local, byid = TRUE) %>%
   as.vector() %>%
   grepl(pattern = "^2")
 grid_local <- grid_local[overlap, ]
-grid_df <- fortify(grid_local)
+grid_df <- grid_df %>%
+  filter(id %in% which(overlap))
 ```
 
 ```{r import_osm}
@@ -223,7 +259,7 @@ building <- osm$ways$tags %>%
   select(id, long, lat)
 ```
 
-```{r cache = FALSE, results="asis"}
+```{r overview_map, cache = FALSE, results="asis"}
 rmd <- knit_expand(
   "_fieldnotes_map.Rmd", 
   id = "overzicht",
@@ -231,6 +267,7 @@ rmd <- knit_expand(
   xmax = max(grid_df$long), 
   ymin = min(grid_df$lat), 
   ymax = max(grid_df$lat),
+  fill = "",
   fig.cap = "Overzicht",
   fig.width = opts_current$get("fig.width"),
   fig.height = opts_current$get("fig.height")
@@ -239,7 +276,24 @@ knit_child(text = rmd, quiet = TRUE) %>%
   cat()
 ```
 
-```{r cache = FALSE, results = "asis", fig.width=10, fig.height=12}
+```{r surveyed_map, cache = FALSE, results="asis"}
+rmd <- knit_expand(
+  "_fieldnotes_map.Rmd", 
+  id = "route",
+  xmin = min(grid_df$long), 
+  xmax = max(grid_df$long), 
+  ymin = min(grid_df$lat), 
+  ymax = max(grid_df$lat),
+  fill = "surveyed",
+  fig.cap = "Huidige inventarisatieinspanning per rastercel.",
+  fig.width = opts_current$get("fig.width"),
+  fig.height = opts_current$get("fig.height")
+)
+knit_child(text = rmd, quiet = TRUE) %>%
+  cat()
+```
+
+```{r detailed_maps, cache = FALSE, results = "asis", fig.width=10, fig.height=12}
 rmd <- base <- grid_df %>%
   summarise(
     xmin = min(long),
@@ -279,6 +333,7 @@ rmd <- expand.grid(
         xmax = x["xmax"], 
         ymin = x["ymin"], 
         ymax = x["ymax"], 
+        fill = "",
         fig.cap = x["caption"],
         fig.width = opts_current$get("fig.width"),
         fig.height = opts_current$get("fig.height")

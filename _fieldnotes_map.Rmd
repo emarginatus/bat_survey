@@ -1,17 +1,23 @@
 ```{r map-{{id}}, fig.cap="{{fig.cap}}", fig.width={{fig.width}}, fig.height={{fig.height}}}
+if ("{{fill}}" != "") {
+  p <- geom_polygon(data = grid_df, aes(group = group, fill = {{fill}}), colour = "black")
+} else {
+  p <- geom_polygon(data = grid_df, aes(group = group), fill = NA, colour = "black")
+}
 ggplot(studyarea_df, aes(x = long, y = lat)) +
   geom_polygon(data = water, aes(group = id), fill = "blue") +
   geom_polygon(data = forest, aes(group = id), fill = "darkgreen") +
   geom_polygon(data = grass, aes(group = id), fill = "green") +
   geom_polygon(data = building, aes(group = id), fill = "red") +
+  p +
   geom_polygon(aes(group = group), fill = NA, colour = "black", size = 2) +
-  geom_polygon(data = grid_df, aes(group = group), fill = NA, colour = "black") +
   geom_path(data = waterway, aes(group = id), colour = "blue") +
   geom_path(data = road, aes(group = id), colour = "grey") +
   coord_fixed(
     xlim = c({{xmin}}, {{xmax}}),
     ylim = c({{ymin}}, {{ymax}})
   ) +
+  scale_fill_gradient2() +
   theme(
     axis.text = element_blank(), 
     axis.title = element_blank(),
