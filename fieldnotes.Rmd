@@ -6,6 +6,8 @@ params:
   studyarea: 1
   crs: "+init=epsg:31370"
   cellsize: 100
+  detail_width: 6
+  detail_height: 8
 ---
 
 ```{r setup, include=FALSE}
@@ -219,25 +221,70 @@ building <- osm$ways$tags %>%
   select(id, long, lat)
 ```
 
-```{r fig.cap = "Overzicht"}
-ggplot(studyarea_df, aes(x = long, y = lat)) +
-  geom_polygon(data = water, aes(group = id), fill = "blue") +
-  geom_polygon(data = forest, aes(group = id), fill = "darkgreen") +
-  geom_polygon(data = grass, aes(group = id), fill = "green") +
-  geom_polygon(data = building, aes(group = id), fill = "red") +
-  geom_polygon(aes(group = group), fill = NA, colour = "black", size = 2) +
-  geom_polygon(data = grid_df, aes(group = group), fill = NA, colour = "black") +
-  geom_path(data = waterway, aes(group = id), colour = "blue") +
-  geom_path(data = road, aes(group = id), colour = "grey") +
-  coord_fixed(
-    xlim = range(grid_df$long),
-    ylim = range(grid_df$lat)
-  ) +
-  theme(
-    axis.text = element_blank(), 
-    axis.title = element_blank(),
-    axis.ticks = element_blank(),
-    panel.background = element_blank(),
-    panel.grid = element_blank()
-  )
+```{r cache = FALSE, results="asis"}
+rmd <- knit_expand(
+  "_fieldnotes_map.Rmd", 
+  id = "overzicht",
+  xmin = min(grid_df$long), 
+  xmax = max(grid_df$long), 
+  ymin = min(grid_df$lat), 
+  ymax = max(grid_df$lat),
+  fig.cap = "Overzicht",
+  fig.width = opts_current$get("fig.width"),
+  fig.height = opts_current$get("fig.height")
+)
+knit_child(text = rmd, quiet = TRUE) %>%
+  cat()
 ```
+
+```{r cache = FALSE, results = "asis", fig.width=10, fig.height=12}
+rmd <- base <- grid_df %>%
+  summarise(
+    xmin = min(long),
+    ymin = min(lat),
+    xmax = max(long),
+    ymax = max(lat),
+    nx = ceiling((xmax - xmin) / params$cellsize / params$detail_width),
+    ny = ceiling((ymax - ymin) / params$cellsize / params$detail_height)
+  )
+rmd <- expand.grid(
+  idx = seq_len(base$nx),
+  idy = seq_len(base$ny)
+) %>%
+  mutate(
+    xmin = seq(
+      base$xmin,
+      base$xmax - params$cellsize * params$detail_width,
+      length.out = base$nx
+    )[idx],
+    ymin = seq(
+      base$ymin,
+      base$ymax - params$cellsize * params$detail_height,
+      length.out = base$ny
+    )[idy],
+    xmax = xmin + params$cellsize * params$detail_width,
+    ymax = ymin + params$cellsize * params$detail_height,
+    id = paste(idx, idy, sep = "-"),
+    caption = paste("Detailkaart", id)
+  ) %>%
+  apply(
+    1, 
+    function(x){
+      knit_expand(
+        "_fieldnotes_map.Rmd", 
+        id = x["id"],
+        xmin = x["xmin"], 
+        xmax = x["xmax"], 
+        ymin = x["ymin"], 
+        ymax = x["ymax"], 
+        fig.cap = x["caption"],
+        fig.width = opts_current$get("fig.width"),
+        fig.height = opts_current$get("fig.height")
+      )
+    }
+  ) %>%
+  paste(collapse = "\n")
+knit_child(text = rmd, quiet = TRUE) %>%
+  cat()
+```
+
