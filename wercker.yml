@@ -1,4 +1,4 @@
-box: emarginatus/render_website
+box: inbobmk/rstable
 build:
   steps:
     - script:
