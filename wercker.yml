@@ -1,0 +1,13 @@
+box: emarginatus/render_website
+build:
+  steps:
+    - script:
+        code: |
+          Rscript -e "render_fieldnotes()"
+ftp:
+  steps:
+    - emarginatus/ftp-deploy:
+        subfolder: "site"
+        destination: $WERCKER_FTP_DEPLOY_DESTINATION
+        username: $WERCKER_FTP_DEPLOY_USERNAME
+        password: $WERCKER_FTP_DEPLOY_PASSWORD
