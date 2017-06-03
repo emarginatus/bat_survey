@@ -3,7 +3,7 @@ build:
   steps:
     - script:
         code: |
-          Rscript -e "render_fieldnotes()"
+          Rscript "render_fieldnotes.R"
 ftp:
   steps:
     - emarginatus/ftp-deploy:
