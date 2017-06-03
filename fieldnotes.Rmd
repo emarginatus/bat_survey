@@ -209,7 +209,17 @@ osm_local <- SpatialPointsDataFrame(
 
 ```{r osm_layers}
 road <- osm$ways$tags %>%
-  filter(k == "highway") %>%
+  filter(
+    k == "highway"
+  ) %>%
+  mutate(
+    class = ifelse(
+      v %in% c("cycleway", "footway", "path", "pedestrian", "steps", "track"),
+      "path",
+      "road"
+    ) %>%
+      factor(levels = c("road", "path"))
+  ) %>%
   inner_join(osm$ways$refs, by = "id") %>%
   inner_join(osm_local, by = "ref")
 waterway <- osm$ways$tags %>%
