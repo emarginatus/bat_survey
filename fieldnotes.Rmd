@@ -29,9 +29,9 @@ library(ggplot2)
 
 ```{r load_data}
 studyarea <- readOGR("studyarea.geojson", verbose = FALSE) %>%
-  subset(id = params$studyarea)
+  subset(id == params$studyarea)
 route <- readOGR("route.geojson", verbose = FALSE) %>%
-  subset(id = params$studyarea)
+  subset(studyarea == params$studyarea)
 ```
 
 ---
