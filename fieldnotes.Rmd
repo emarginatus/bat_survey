@@ -70,7 +70,9 @@ studyarea_proj <- spTransform(studyarea, CRS(params$crs))
 studyarea_buffer <- studyarea_proj %>%
   gBuffer(width = 5 * params$cellsize) %>%
   spTransform(CRS("+proj=longlat"))
-route_proj <- spTransform(route, CRS(params$crs))
+if (length(route) > 0) {
+  route_proj <- spTransform(route, CRS(params$crs))
+}
 ```
 
 ```{r find_optimal_angle}
@@ -118,23 +120,25 @@ studyarea_df <- fortify(studyarea_local)
 ```
 
 ```{r rotate_route}
-route_local <- route_proj
-route_local@proj4string <- CRS("")
-route_local@lines <- lapply(
-  route_local@lines,
-  function(x){
-    x@Lines <- lapply(
-      x@Lines,
-      function(y){
-        y@coords <- -matrix(center, byrow = TRUE, ncol = 2, nrow = nrow(y@coords)) %>%
-          "+"(y@coords) %>%
-          "%*%"(matrix(c(cos(angle), sin(angle), -sin(angle), cos(angle)), ncol = 2))
-        return(y)
-      }
-    )
-    return(x)
-  }
-)
+if (length(route) > 0) {
+  route_local <- route_proj
+  route_local@proj4string <- CRS("")
+  route_local@lines <- lapply(
+    route_local@lines,
+    function(x){
+      x@Lines <- lapply(
+        x@Lines,
+        function(y){
+          y@coords <- -matrix(center, byrow = TRUE, ncol = 2, nrow = nrow(y@coords)) %>%
+            "+"(y@coords) %>%
+            "%*%"(matrix(c(cos(angle), sin(angle), -sin(angle), cos(angle)), ncol = 2))
+          return(y)
+        }
+      )
+      return(x)
+    }
+  )
+}
 ```
 
 ```{r local_grid}
@@ -164,14 +168,16 @@ grid_local <- lapply(
 ) %>%
   SpatialPolygons()
 grid_local$surveyed <- rep(0, length(grid_local))
-surveyed <- gBuffer(route_local, width = 20) %>%
-  gIntersection(grid_local, byid = TRUE) %>%
-  gArea(byid = TRUE) %>%
-  "/"(params$cellsize ^ 2)
-grid_local$surveyed[
-  gsub("buffer ", "", names(surveyed)) %>%
-    as.integer()
-] <- surveyed
+if (length(route) > 0) {
+  surveyed <- gBuffer(route_local, width = 20) %>%
+    gIntersection(grid_local, byid = TRUE) %>%
+    gArea(byid = TRUE) %>%
+    "/"(params$cellsize ^ 2)
+  grid_local$surveyed[
+    gsub("buffer ", "", names(surveyed)) %>%
+      as.integer()
+  ] <- surveyed
+}
 grid_df <- fortify(grid_local)
 grid_df$surveyed <- grid_local$surveyed[as.integer(grid_df$id)]
   
