@@ -18,7 +18,7 @@ ignoreFiles = ["\\.Rmd$", "_files$", "_cache$"]
     url = "https://github.com/emarginatus/bat_survey"
 
 [params]
-    description = "A website met vleermuisonderzoek door Vleermuizenwerkgroep Myotis"
+    description = "Een website met vleermuisonderzoek door Vleermuizenwerkgroep Myotis"
 
     # options for highlight.js (version, additional languages, and theme)
     highlightjsVersion = "9.11.0"
