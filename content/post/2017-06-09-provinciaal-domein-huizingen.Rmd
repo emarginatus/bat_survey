@@ -1,0 +1,46 @@
+---
+title: Inventarisatie provinciaal domein Huizingen
+author: Thierry Onkelinx
+date: '2017-06-09'
+slug: prov_dom_huizingen
+categories:
+  - batdetector
+tags: []
+params:
+  studyarea: 1
+  detector_range: 20
+---
+
+Tijdens de zomer van 2017 streven we er naar om maandelijks het [Provinciaal domein van Huizingen](http://www.vlaamsbrabant.be/vrije-tijd-cultuur/provinciedomeinen/huizingen/index.jsp) te onderzoeken op de aanwezigheid van vleermuizen. Op deze pagina vind je een overzicht van onze resultaten. Naarmate de zomer vordert zullen we deze pagina bijwerken met de nieuwe waarnemingen. Het loont dus de moeite om af en toe eens opnieuw te komen kijken.
+
+```{r include=FALSE}
+library(knitr)
+opts_chunk$set(
+  message = FALSE,
+  echo = FALSE
+)
+library(htmlwidgets)
+setWidgetIdSeed(1)
+library(rgdal)
+library(dplyr)
+library(leaflet)
+```
+
+```{r}
+studyarea <- readOGR("../../data/studyarea.geojson", verbose = FALSE) %>%
+  subset(id == params$studyarea)
+```
+
+## De opzet
+
+Binnen het studiegebied lopen we op verschillende momenten rond met batdetectoren. We noteren telkens welke route we volgen. Daarnaast noteren we tevens de plaats waar we vleermuizen waarnemen. 
+
+```{r studiegebied, fig.cap = "Het studiegebied van dit onderzoek."}
+leaflet(studyarea) %>%
+  addTiles() %>%
+  addPolygons()
+```
+
+We maken telkens opnames van deze geluiden om later ze later zo goed mogelijk op naam te brengen en een inschatting te maken van de aantallen. Merk dat op deze aantalsschattingen niet als absolute aantallen mogen geïnterpreteerd worden. Eerder als een ondergrens. Een opname met 3 gewone dwergvleermuizen moet je dus interpreteren als minstens 3 gewone dwergvleermuizen.
+
+De afstand waarover de vleermuisgeluiden hoorbaar zijn is variabel. Het hangt voor een belangrijk deel af van luid de vleermuis roept en dat verschilt van soort tot soort. Voorlopig gebruiken we een standaard afstand van `r params$detector_range` meter.
