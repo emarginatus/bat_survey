@@ -8,6 +8,7 @@ categories:
 tags: []
 params:
   studyarea: 1
+  crs: "+init=epsg:31370"
   detector_range: 20
 ---
 
@@ -23,6 +24,7 @@ opts_chunk$set(
 library(htmlwidgets)
 setWidgetIdSeed(1)
 library(rgdal)
+library(rgeos)
 library(dplyr)
 library(leaflet)
 ```
@@ -32,6 +34,12 @@ studyarea <- readOGR("../../data/studyarea.geojson", verbose = FALSE) %>%
   subset(id == params$studyarea)
 route <- readOGR("../../data/route.geojson", verbose = FALSE) %>%
   subset(studyarea == params$studyarea)
+```
+
+```{r bewerkingen}
+route$afstand <- route %>%
+  spTransform(CRS(params$crs)) %>%
+  gLength(byid = TRUE)
 ```
 
 ## De opzet
@@ -48,11 +56,31 @@ We maken telkens opnames van deze geluiden om later ze later zo goed mogelijk op
 
 De afstand waarover de vleermuisgeluiden hoorbaar zijn is variabel. Het hangt voor een belangrijk deel af van luid de vleermuis roept en dat verschilt van soort tot soort. Voorlopig gebruiken we een standaard afstand van `r params$detector_range` meter.
 
-## De route
+## De routes
 
 Laat ons eerst even kijken welke routes reeds gelopen zijn. We proberen telkens het domein zo goed mogelijk af te dekken.
 
-```{r route, fig.cap = "De reeds gelopen routes. Klik op de route om de datum te zien."}
+```{r route-tabel, results = "asis"}
+individueel <- route@data %>%
+  select(datum = date, afstand) %>%
+  mutate(
+    datum = as.character(datum),
+    afstand = afstand
+  )
+bind_rows(
+  individueel,
+  individueel %>%
+    summarise(afstand = sum(afstand)) %>%
+    mutate(datum = "totaal")
+) %>%
+  mutate(afstand = round(afstand / 1e3, 2)) %>%
+  kable(
+    caption = "Overzicht van de routes en hun lengte (in km).",
+    rownames = FALSE
+  )
+```
+
+```{r route-kaart, fig.cap = "De reeds gelopen routes. Klik op de route om de datum te zien."}
 route_datum <- levels(route$date) %>%
   length() %>%
   topo.colors()
