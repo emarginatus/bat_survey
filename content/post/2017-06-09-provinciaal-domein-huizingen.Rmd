@@ -17,6 +17,7 @@ Tijdens de zomer van 2017 streven we er naar om maandelijks het [Provinciaal dom
 library(knitr)
 opts_chunk$set(
   message = FALSE,
+  warning = FALSE,
   echo = FALSE
 )
 library(htmlwidgets)
@@ -26,9 +27,11 @@ library(dplyr)
 library(leaflet)
 ```
 
-```{r}
+```{r gegevens_laden}
 studyarea <- readOGR("../../data/studyarea.geojson", verbose = FALSE) %>%
   subset(id == params$studyarea)
+route <- readOGR("../../data/route.geojson", verbose = FALSE) %>%
+  subset(studyarea == params$studyarea)
 ```
 
 ## De opzet
@@ -44,3 +47,18 @@ leaflet(studyarea) %>%
 We maken telkens opnames van deze geluiden om later ze later zo goed mogelijk op naam te brengen en een inschatting te maken van de aantallen. Merk dat op deze aantalsschattingen niet als absolute aantallen mogen geïnterpreteerd worden. Eerder als een ondergrens. Een opname met 3 gewone dwergvleermuizen moet je dus interpreteren als minstens 3 gewone dwergvleermuizen.
 
 De afstand waarover de vleermuisgeluiden hoorbaar zijn is variabel. Het hangt voor een belangrijk deel af van luid de vleermuis roept en dat verschilt van soort tot soort. Voorlopig gebruiken we een standaard afstand van `r params$detector_range` meter.
+
+## De route
+
+Laat ons eerst even kijken welke routes reeds gelopen zijn. We proberen telkens het domein zo goed mogelijk af te dekken.
+
+```{r route, fig.cap = "De reeds gelopen routes. Klik op de route om de datum te zien."}
+route_datum <- levels(route$date) %>%
+  length() %>%
+  topo.colors()
+pal_route_datum <- colorFactor(route_datum, route$date)
+leaflet(studyarea) %>%
+  addTiles() %>%
+  addPolygons(weight = 2, fillOpacity = 0.1) %>%
+  addPolylines(data = route, color = ~pal_route_datum(date), popup = ~date)
+```
