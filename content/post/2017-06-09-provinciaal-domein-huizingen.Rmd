@@ -1,0 +1,164 @@
+---
+title: Inventarisatie provinciaal domein Huizingen
+author: Thierry Onkelinx
+date: '2017-06-09'
+slug: prov_dom_huizingen
+categories:
+  - batdetector
+tags: []
+params:
+  studyarea: 1
+  crs: "+init=epsg:31370"
+  detector_range: 20
+  cellsize: 100
+---
+
+Tijdens de zomer van 2017 streven we er naar om maandelijks het [Provinciaal domein van Huizingen](http://www.vlaamsbrabant.be/vrije-tijd-cultuur/provinciedomeinen/huizingen/index.jsp) te onderzoeken op de aanwezigheid van vleermuizen. Op deze pagina vind je een overzicht van onze resultaten. Naarmate de zomer vordert zullen we deze pagina bijwerken met de nieuwe waarnemingen. Het loont dus de moeite om af en toe eens opnieuw te komen kijken.
+
+```{r include=FALSE}
+library(knitr)
+opts_chunk$set(
+  message = FALSE,
+  warning = FALSE,
+  echo = FALSE
+)
+library(htmlwidgets)
+setWidgetIdSeed(1)
+library(rgdal)
+library(rgeos)
+library(dplyr)
+library(leaflet)
+```
+
+```{r gegevens_laden}
+studyarea <- readOGR("../../data/studyarea.geojson", verbose = FALSE) %>%
+  subset(id == params$studyarea)
+route <- readOGR("../../data/route.geojson", verbose = FALSE) %>%
+  subset(studyarea == params$studyarea)
+```
+
+```{r bewerkingen}
+studyarea_local <- spTransform(studyarea, CRS(params$crs))
+route_local <- spTransform(route, CRS(params$crs))
+route$afstand <- gLength(route_local, byid = TRUE)
+```
+
+```{r bereken_grid}
+grid_df <- expand.grid(
+  long = seq(
+    bbox(studyarea_local)["x", "min"] - 0.5 * params$cellsize,
+    bbox(studyarea_local)["x", "max"] + params$cellsize,
+    by = params$cellsize
+  ),
+  lat = seq(
+    bbox(studyarea_local)["y", "min"] - 0.5 * params$cellsize,
+    bbox(studyarea_local)["y", "max"] + params$cellsize,
+    by = params$cellsize
+  )
+)
+grid_local <- lapply(
+  seq_along(grid_df$long), 
+  function(i){
+    cbind(
+      grid_df$long[i] + params$cellsize * c(0, 1, 1, 0, 0),
+      grid_df$lat[i] + params$cellsize * c(0, 0, 1, 1, 0)
+    ) %>%
+      Polygon() %>%
+      list() %>%
+      Polygons(ID = i)
+  }
+) %>%
+  SpatialPolygons(proj4string = CRS(params$crs))
+grid_local$surveyed <- rep(0, length(grid_local))
+if (length(route) > 0) {
+  surveyed <- gBuffer(route_local, width = params$detector_range) %>%
+    gIntersection(grid_local, byid = TRUE) %>%
+    gArea(byid = TRUE) %>%
+    "/"(params$cellsize ^ 2)
+  grid_local$surveyed[
+    gsub("buffer ", "", names(surveyed)) %>%
+      as.integer()
+  ] <- surveyed
+}
+
+overlap <- gRelate(studyarea_local, grid_local, byid = TRUE) %>%
+  as.vector() %>%
+  grepl(pattern = "^2")
+grid_local <- grid_local[overlap, ]
+
+grid <- spTransform(grid_local, studyarea@proj4string)
+```
+
+## De opzet
+
+Binnen het studiegebied lopen we op verschillende momenten rond met batdetectoren. We noteren telkens welke route we volgen. Daarnaast noteren we tevens de plaats waar we vleermuizen waarnemen. 
+
+```{r studiegebied, fig.cap = "Het studiegebied van dit onderzoek."}
+leaflet(studyarea) %>%
+  addTiles() %>%
+  addPolygons()
+```
+
+We maken telkens opnames van deze geluiden om later ze later zo goed mogelijk op naam te brengen en een inschatting te maken van de aantallen. Merk dat op deze aantalsschattingen niet als absolute aantallen mogen geïnterpreteerd worden. Eerder als een ondergrens. Een opname met 3 gewone dwergvleermuizen moet je dus interpreteren als minstens 3 gewone dwergvleermuizen.
+
+De afstand waarover de vleermuisgeluiden hoorbaar zijn is variabel. Het hangt voor een belangrijk deel af van luid de vleermuis roept en dat verschilt van soort tot soort. Voorlopig gebruiken we een standaard afstand van `r params$detector_range` meter.
+
+## De routes
+
+Laat ons eerst even kijken welke routes reeds gelopen zijn. We proberen telkens het domein zo goed mogelijk af te dekken.
+
+```{r route-tabel, results = "asis"}
+individueel <- route@data %>%
+  select(datum = date, afstand) %>%
+  mutate(
+    datum = as.character(datum),
+    afstand = afstand
+  )
+bind_rows(
+  individueel,
+  individueel %>%
+    summarise(afstand = sum(afstand)) %>%
+    mutate(datum = "totaal")
+) %>%
+  mutate(afstand = round(afstand / 1e3, 2)) %>%
+  kable(
+    caption = "Overzicht van de routes en hun lengte (in km).",
+    rownames = FALSE
+  )
+```
+
+```{r route-kaart, fig.cap = "De reeds gelopen routes. Klik op de route om de datum te zien."}
+route_datum <- levels(route$date) %>%
+  length() %>%
+  topo.colors()
+pal_route_datum <- colorFactor(route_datum, route$date)
+leaflet(studyarea) %>%
+  addTiles() %>%
+  addPolygons(weight = 2, fillOpacity = 0.1) %>%
+  addPolylines(data = route, color = ~pal_route_datum(date), popup = ~date)
+```
+
+Als we veronderstellen dat we vleermuizen waarnemen wanneer ze op minder dan `r params$detector_range` m van de detector komen, dan dekken de routes een gebied van `r params$detector_range` m langs beide zijden van de routes. De routes lijken dan op een lint van `r 2 * params$detector_range` m breed. 
+
+Op een aantal plaatsen kruisen of overlappende de routes elkaar (of zichzelf). Om het globale beeld eenvoudiger voor te stellen hebben we het studiegebied opgedeeld in hokken van `r sprintf("%1$ix%1$im", params$cellsize)`. Voor elk van deze hokken tellen we de totale oppervlakte van de linten in het hok samen en delen we dit door de oppervlakte van het hok. Dit heten we het "aandeel onderzocht".
+
+Door niet steeds dezelfde route te lopen, kunnen we proberen om een zo groot mogelijk deel van het gebied te onderzoeken.
+
+```{r inventarisatiegraad, fig.cap = sprintf("Inventarisatiegraad per hok van %1$ix%1$im", params$cellsize)}
+pal_grid_surveyed <- colorNumeric("Reds", domain = range(grid$surveyed))
+leaflet(grid) %>%
+  addTiles() %>%
+  addPolygons(
+    color = ~pal_grid_surveyed(surveyed),
+    fill = ~pal_grid_surveyed(surveyed),
+    fillOpacity = 0.5,
+    weight = 3
+  ) %>%
+  addPolygons(data = studyarea, weight = 2, fill = NULL) %>%
+  addLegend(
+    pal = pal_grid_surveyed, 
+    values = ~surveyed, 
+    title = "Aandeel<br>onderzocht"
+  )
+```
+
