@@ -3,8 +3,8 @@
 .RData
 .Ruserdata
 *.Rproj
-*.html
 *_cache
 *_files
 *.pdf
 public
+blogdown
