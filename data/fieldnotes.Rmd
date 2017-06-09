@@ -1,6 +1,5 @@
 ---
 author: "Thierry Onkelinx"
-date: "`r paste('Versie:', format(Sys.time(), '%e/%m/%Y %T %Z'))`"
 header-includes:
    - \usepackage[dutch]{babel}
 output: pdf_document
@@ -28,9 +27,9 @@ library(ggplot2)
 ```
 
 ```{r load_data}
-studyarea <- readOGR("studyarea.geojson", verbose = FALSE) %>%
+studyarea <- readOGR("../../data/studyarea.geojson", verbose = FALSE) %>%
   subset(id == params$studyarea)
-route <- readOGR("route.geojson", verbose = FALSE) %>%
+route <- readOGR("../../data/route.geojson", verbose = FALSE) %>%
   subset(studyarea == params$studyarea)
 ```
 

@@ -1,0 +1,8 @@
+---
+date: 2017-06-09T14:31:34+02:00
+title: Over ons
+---
+
+Op deze pagina kan je een aantal resultaten vinden van vleermuizenonderzoek dat gebeurde door medewerkers van Vleermuizengroep Myotis.
+
+Benieuwd hoe we de gegevens analyseerden? Je vindt de broncode van de analyses op de bijhorende [GitHub repostory](https://www.github.com/emarginatus/bat_survey)
